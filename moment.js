@@ -415,6 +415,9 @@
         // parse Moment object
         if (input && input._d instanceof Date) {
             date = new Date(+input._d);
+        // parse MongoDate format
+        } else if (input instanceof Object && input.hasOwnProperty('sec') && input.hasOwnProperty('usec')) {
+            date = new Date((input.sec * 1000) + (input.usec / 1000));
         // parse string and format
         } else if (format) {
             if (isArray(format)) {
@@ -658,7 +661,7 @@
         },
 
         isDST : function () {
-            return (this.zone() < moment([this.year()]).zone() || 
+            return (this.zone() < moment([this.year()]).zone() ||
                 this.zone() < moment([this.year(), 5]).zone());
         },
 
