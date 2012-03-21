@@ -1,5 +1,5 @@
 // moment.js
-// version : 1.4.0
+// version : 1.5.0
 // author : Tim Wood
 // license : MIT
 // momentjs.com
@@ -26,7 +26,7 @@
             ['HH', /T\d\d/]
         ],
         timezoneParseRegex = /([\+\-]|\d\d)/gi,
-        VERSION = "1.4.0",
+        VERSION = "1.5.0",
         shortcuts = 'Month|Date|Hours|Minutes|Seconds|Milliseconds'.split('|');
 
     // Moment prototype object
@@ -564,6 +564,11 @@
         }
     });
 
+    // compare moment object
+    moment.isMoment = function (obj) {
+        return obj instanceof Moment;
+    };
+
     // shortcut for prototype
     moment.fn = Moment.prototype = {
 
@@ -666,7 +671,7 @@
         },
 
         day : function (input) {
-            var day = this._d.getDay();
+            var day = this._isUTC ? this._d.getUTCDay() : this._d.getDay();
             return input == null ? day :
                 this.add({ d : input - day });
         },
