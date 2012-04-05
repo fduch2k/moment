@@ -13,12 +13,12 @@
         paramsToParse = 'months|monthsShort|monthsParse|weekdays|weekdaysShort|longDateFormat|calendar|relativeTime|ordinal|meridiem'.split('|'),
         i,
         jsonRegex = /^\/?Date\((\-?\d+)/i,
-        charactersToReplace = /(\[[^\[]*\])|(\\)?(Mo|MM?M?M?|Do|DDDo|DD?D?D?|dddd?|do?|w[o|w]?|YYYY|YY|a|A|hh?|HH?|mm?|ss?|zz?|ZZ?|LT|LL?L?L?)/g,
+        charactersToReplace = /(\[[^\[]*\])|(\\)?(Mo|MM?M?M?|Do|DDDo|DD?D?D?|dddd?|do?|w[o|w]?|YYYY|YY|a|A|hh?|HH?|mm?|ss?|SS?S?|zz?|ZZ?|LT|LL?L?L?)/g,
         nonuppercaseLetters = /[^A-Z]/g,
         timezoneRegex = /\([A-Za-z ]+\)|:[0-9]{2} [A-Z]{3} /g,
         tokenCharacters = /(\\)?(MM?M?M?|dd?d?d|DD?D?D?|YYYY|YY|a|A|hh?|HH?|mm?|ss?|ZZ?|T)/g,
-        inputCharacters = /(\\)?([0-9]+|([a-zA-Z\u00A0-\uD7FF\uF900-\uFDCF\uFDF0-\uFFEF])+|([\+\-]\d\d:?\d\d))/gi,
-        isoRegex = /\d{4}.\d\d.\d\d(T(\d\d(.\d\d(.\d\d)?)?)?([\+\-]\d\d:?\d\d)?)?/,
+        inputCharacters = /(\\)?([0-9]{1,2}[\u6708\uC6D4]|[0-9]+|([a-zA-Z\u00A0-\uD7FF\uF900-\uFDCF\uFDF0-\uFFEF])+|([\+\-]\d\d:?\d\d))/gi,
+        isoRegex = /^\s*\d{4}-\d\d-\d\d(T(\d\d(:\d\d(:\d\d)?)?)?([\+\-]\d\d:?\d\d)?)?/,
         isoFormat = 'YYYY-MM-DDTHH:mm:ssZ',
         isoTimes = [
             ['HH:mm:ss', /T\d\d:\d\d:\d\d/],
@@ -99,6 +99,7 @@
             currentMinutes = m.minutes(),
             currentSeconds = m.seconds(),
             currentZone = -m.zone(),
+            currentMilliseconds = m.milliseconds(),
             ordinal = moment.ordinal,
             meridiem = moment.meridiem;
         // check if the character is a format
@@ -165,9 +166,9 @@
                 return currentYear;
             // AM / PM
             case 'a' :
-                return currentHours > 11 ? meridiem.pm : meridiem.am;
+                return meridiem ? meridiem(currentHours, currentMinutes, false) : (currentHours > 11 ? 'pm' : 'am');
             case 'A' :
-                return currentHours > 11 ? meridiem.PM : meridiem.AM;
+                return meridiem ? meridiem(currentHours, currentMinutes, true) : (currentHours > 11 ? 'PM' : 'AM');
             // 24 HOUR
             case 'H' :
                 return currentHours;
@@ -188,6 +189,12 @@
                 return currentSeconds;
             case 'ss' :
                 return leftZeroFill(currentSeconds, 2);
+            case 'S' :
+                return ~~ (currentMilliseconds / 100);
+            case 'SS' :
+                return leftZeroFill(~~(currentMilliseconds / 10), 2);
+            case 'SSS' :
+                return leftZeroFill(currentMilliseconds, 3);
             // TIMEZONE
             case 'zz' :
                 // depreciating 'zz' fall through to 'z'
@@ -379,10 +386,10 @@
     }
 
     // helper function for _date.from() and _date.fromNow()
-    function substituteTimeAgo(string, number, withoutSuffix) {
+    function substituteTimeAgo(string, number, withoutSuffix, isFuture) {
         var rt = moment.relativeTime[string];
         return (typeof rt === 'function') ?
-            rt(number || 1, !!withoutSuffix, string) :
+            rt(number || 1, !!withoutSuffix, string, isFuture) :
             rt.replace(/%d/i, number || 1);
     }
 
@@ -403,6 +410,7 @@
                 days < 345 && ['MM', round(days / 30)] ||
                 years === 1 && ['y'] || ['yy', years];
         args[2] = withoutSuffix;
+        args[3] = milliseconds > 0;
         return substituteTimeAgo.apply({}, args);
     }
 
@@ -444,6 +452,11 @@
             return new Moment(new Date(Date.UTC.apply({}, input)), true);
         }
         return (format && input) ? moment(input + ' 0', format + ' Z').utc() : moment(input).utc();
+    };
+
+    // creating with unix timestamp (in seconds)
+    moment.unix = function (input) {
+        return moment(input * 1000);
     };
 
     // humanizeDuration
@@ -503,7 +516,7 @@
         if (languages[key]) {
             for (i = 0; i < paramsToParse.length; i++) {
                 param = paramsToParse[i];
-                moment[param] = languages[key][param] || moment[param];
+                moment[param] = languages[key][param] || languages.en[param];
             }
         } else {
             if (hasModule) {
@@ -526,12 +539,7 @@
             LLL : "MMMM D YYYY LT",
             LLLL : "dddd, MMMM D YYYY LT"
         },
-        meridiem : {
-            AM : 'AM',
-            am : 'am',
-            PM : 'PM',
-            pm : 'pm'
-        },
+        meridiem : false,
         calendar : {
             sameDay : '[Today at] LT',
             nextDay : '[Tomorrow at] LT',
@@ -578,6 +586,10 @@
 
         valueOf : function () {
             return +this._d;
+        },
+
+        unix : function () {
+            return Math.floor(+this._d / 1000);
         },
 
         'native' : function () {
